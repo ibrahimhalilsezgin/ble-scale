@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ESP32-S3 BLE Tartı & BIA Telemetri Paneli</title>
+  <style>
+    :root {
+      --bg: #090a0f;
+      --card: #11131c;
+      --card-alt: #161925;
+      --border: #232738;
+      --text: #f3f4f6;
+      --muted: #8b92a8;
+      --accent: #38bdf8;
+      --emerald: #10b981;
+      --amber: #f59e0b;
+      --rose: #f43f5e;
+      --purple: #a855f7;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 20px;
+      line-height: 1.45;
+    }
+
+    .mono {
+      font-family: "JetBrains Mono", Consolas, "Courier New", monospace;
+    }
+
+    .container {
+      max-width: 1420px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 22px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 12px var(--emerald);
+    }
+
+    .brand-dot.offline {
+      background: var(--rose);
+      box-shadow: 0 0 12px var(--rose);
+    }
+
+    .brand h1 {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .brand p {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .header-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 8px;
+      background: var(--card-alt);
+      border: 1px solid var(--border);
+    }
+
+    .btn {
+      background: var(--card-alt);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 7px 13px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .btn-primary {
+      background: rgba(56, 189, 248, 0.12);
+      border-color: rgba(56, 189, 248, 0.35);
+      color: var(--accent);
+    }
+
+    .btn-amber {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: rgba(245, 158, 11, 0.4);
+      color: var(--amber);
+    }
+
+    .top-grid {
+      display: grid;
+      grid-template-columns: 1.05fr 1.25fr;
+      gap: 18px;
+    }
+
+    @media (max-width: 980px) {
+      .top-grid, .bottom-grid, .inspector-grid {
+        grid-template-columns: 1fr !important;
+      }
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 12px;
+    }
+
+    .card-title {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+
+    .scale-display {
+      background: linear-gradient(180deg, #0d1018 0%, #090b10 100%);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 28px 24px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .scale-status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 999px;
+      margin-bottom: 12px;
+      background: rgba(139, 146, 168, 0.12);
+      color: var(--muted);
+      border: 1px solid rgba(139, 146, 168, 0.25);
+    }
+
+    .scale-status-pill.measuring {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--amber);
+      border-color: rgba(245, 158, 11, 0.35);
+    }
+
+    .scale-status-pill.locked {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--emerald);
+      border-color: rgba(16, 185, 129, 0.4);
+    }
+
+    .weight-value {
+      font-size: 72px;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      line-height: 1;
+      color: var(--text);
+      transition: color 0.2s;
+    }
+
+    .weight-value.locked {
+      color: var(--emerald);
+      text-shadow: 0 0 28px rgba(16, 185, 129, 0.25);
+    }
+
+    .weight-unit {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--muted);
+      margin-left: 6px;
+    }
+
+    .telemetry-mini-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    .mini-stat {
+      background: var(--card-alt);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+
+    .mini-stat .label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+    }
+
+    .mini-stat .val {
+      font-size: 16px;
+      font-weight: 700;
+      margin-top: 3px;
+    }
+
+    .profile-bar {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      background: var(--card-alt);
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+
+    .profile-field label {
+      display: block;
+      font-size: 10px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+
+    .profile-field input,
+    .profile-field select {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .bia-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .bia-box {
+      background: var(--card-alt);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .bia-box .title {
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .bia-box .num {
+      font-size: 22px;
+      font-weight: 800;
+      margin: 6px 0 2px;
+    }
+
+    .bia-box .sub {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .byte-strip {
+      display: grid;
+      grid-template-columns: repeat(15, minmax(52px, 1fr));
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .byte-cell {
+      background: var(--card-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 4px;
+      text-align: center;
+    }
+
+    .byte-cell.highlight-w {
+      border-color: rgba(16, 185, 129, 0.55);
+      background: rgba(16, 185, 129, 0.08);
+    }
+
+    .byte-cell.highlight-imp {
+      border-color: rgba(56, 189, 248, 0.55);
+      background: rgba(56, 189, 248, 0.08);
+    }
+
+    .byte-cell.highlight-lock {
+      border-color: rgba(245, 158, 11, 0.55);
+      background: rgba(245, 158, 11, 0.08);
+    }
+
+    .byte-idx {
+      font-size: 9px;
+      color: var(--muted);
+    }
+
+    .byte-hex {
+      font-size: 14px;
+      font-weight: 700;
+      margin: 3px 0;
+    }
+
+    .byte-dec {
+      font-size: 10px;
+      color: var(--accent);
+      margin-bottom: 2px;
+    }
+
+    .byte-role {
+      font-size: 9px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .inspector-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.35fr;
+      gap: 18px;
+    }
+
+    .bottom-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: 18px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    th, td {
+      padding: 8px 10px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    th {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      position: sticky;
+      top: 0;
+      background: var(--card);
+      z-index: 2;
+    }
+
+    tr.pkt-row {
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+
+    tr.pkt-row:hover {
+      background: rgba(56, 189, 248, 0.08);
+    }
+
+    tr.pkt-row.locked-row {
+      background: rgba(16, 185, 129, 0.07);
+    }
+
+    .pill-mini {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 6px;
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .pill-mini.locked {
+      background: rgba(16, 185, 129, 0.16);
+      color: var(--emerald);
+    }
+
+    .pill-mini.measuring {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--amber);
+    }
+
+    .terminal {
+      background: #06070b;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      height: 250px;
+      overflow-y: auto;
+      font-size: 11.5px;
+      color: #a5b4fc;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .terminal-line .ts {
+      color: #64748b;
+      margin-right: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <span id="connDot" class="brand-dot offline"></span>
+        <div>
+          <h1>ESP32-S3 BLE Tartı &amp; BIA Telemetri</h1>
+          <p class="mono" id="connText">Port kontrol ediliyor...</p>
+        </div>
+      </div>
+
+      <div class="header-controls">
+        <span class="badge mono">MAC: <strong id="macLabel">78:66:a5:25:89:cb</strong></span>
+        <span class="badge mono">Toplam Paket: <strong id="pktCount">0</strong></span>
+        <button class="btn" onclick="reclaimPort()">COM3 Portu Devral</button>
+        <button class="btn" onclick="simulatePacket(false)">Test: Ölçülüyor (76.25 kg)</button>
+        <button class="btn btn-primary" onclick="simulatePacket(true)">Test: Sabitle &amp; BIA Çöz</button>
+      </div>
+    </header>
+
+    <div class="top-grid">
+      <!-- Sol: Canlı Tartı Kadranı -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Canlı Ağırlık &amp; Sensör Telemetrisi</span>
+          <span class="mono" style="font-size:11px;color:var(--muted)" id="lastUpdateLabel">Son: —</span>
+        </div>
+
+        <div class="scale-display">
+          <div id="statusPill" class="scale-status-pill">TARTI BEKLENİYOR</div>
+          <div>
+            <span id="weightVal" class="weight-value mono">0.00</span>
+            <span class="weight-unit">kg</span>
+          </div>
+          <div class="mono" style="font-size:12px;color:var(--muted);margin-top:8px;" id="weightSubRaw">
+            Ham: 0 (0x0000) | 0.00 lb
+          </div>
+        </div>
+
+        <div class="telemetry-mini-grid">
+          <div class="mini-stat">
+            <div class="label">BIA Empedans</div>
+            <div class="val mono" id="impVal">0 Ω</div>
+          </div>
+          <div class="mini-stat">
+            <div class="label">Sinyal (RSSI)</div>
+            <div class="val mono" id="rssiVal">— dBm</div>
+          </div>
+          <div class="mini-stat">
+            <div class="label">Sayaç (SEQ)</div>
+            <div class="val mono" id="seqVal">#0</div>
+          </div>
+          <div class="mini-stat">
+            <div class="label">Durum / Lock</div>
+            <div class="val mono" id="chkVal">0x24</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sağ: BIA Vücut Analizi -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">BIA Vücut Kompozisyonu Analizi</span>
+          <span style="font-size:11px;color:var(--accent)" id="biaModeLabel">Profil + Empedans</span>
+        </div>
+
+        <div class="profile-bar">
+          <div class="profile-field">
+            <label>Boy (cm)</label>
+            <input type="number" id="userHeight" value="178" min="100" max="230" onchange="saveProfile()" />
+          </div>
+          <div class="profile-field">
+            <label>Yaş</label>
+            <input type="number" id="userAge" value="24" min="10" max="100" onchange="saveProfile()" />
+          </div>
+          <div class="profile-field">
+            <label>Cinsiyet</label>
+            <select id="userGender" onchange="saveProfile()">
+              <option value="male">Erkek</option>
+              <option value="female">Kadın</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="bia-grid">
+          <div class="bia-box">
+            <span class="title">VKİ (BMI)</span>
+            <span class="num mono" id="bmiVal">—</span>
+            <span class="sub" id="bmiStatus">Tartım bekleniyor</span>
+          </div>
+          <div class="bia-box">
+            <span class="title">Vücut Yağ Oranı</span>
+            <span class="num mono" id="fatVal" style="color:var(--amber)">—</span>
+            <span class="sub" id="fatMassSub">Yağ Kütlesi: — kg</span>
+          </div>
+          <div class="bia-box">
+            <span class="title">Kas Kütlesi</span>
+            <span class="num mono" id="muscleVal" style="color:var(--emerald)">—</span>
+            <span class="sub" id="ffmSub">Yağsız Kütle: — kg</span>
+          </div>
+          <div class="bia-box">
+            <span class="title">Vücut Suyu (TBW)</span>
+            <span class="num mono" id="waterVal" style="color:var(--accent)">—</span>
+            <span class="sub" id="waterSub">İdeal: %50 - %65</span>
+          </div>
+          <div class="bia-box">
+            <span class="title">Kemik &amp; Protein</span>
+            <span class="num mono" id="boneVal">—</span>
+            <span class="sub" id="proteinSub">Protein: —</span>
+          </div>
+          <div class="bia-box">
+            <span class="title">Bazal Metabolizma</span>
+            <span class="num mono" id="bmrVal">—</span>
+            <span class="sub" id="metaAgeSub">Metabolik Yaş: —</span>
+          </div>
+          <div class="bia-box">
+            <span class="title">İç Organ Yağ Skoru</span>
+            <span class="num mono" id="visceralVal" style="color:var(--purple)">—</span>
+            <span class="sub">1-9 Normal | 10+ Yüksek</span>
+          </div>
+          <div class="bia-box">
+            <span class="title">İdeal Kilo &amp; Fark</span>
+            <span class="num mono" id="idealVal">—</span>
+            <span class="sub" id="idealDiffSub">Hedef farkı: —</span>
+          </div>
+          <div class="bia-box">
+            <span class="title">Elektrod / BIA Durumu</span>
+            <span class="num mono" id="biaStateVal" style="font-size:15px">—</span>
+            <span class="sub" id="biaStateSub">b[4..5] sensör durumu</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Orta 1: 15-Byte Manufacturer Frame Çözücü -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">15-Byte BLE Manufacturer Data Hücreleri (HEX &amp; DEC)</span>
+        <span class="mono" style="font-size:11px;color:var(--amber)" id="diffLabel">DIFF: —</span>
+      </div>
+
+      <div id="byteStrip" class="byte-strip"></div>
+      <div class="mono" style="font-size:11px;color:var(--muted);word-break:break-all;">
+        TAM BLE REKLAM PAKETİ (RAW): <span id="rawHexLabel" style="color:var(--text)">—</span>
+      </div>
+    </div>
+
+    <!-- Orta 2: GELEN TÜM VERİLER & CANLI PAKET AKIŞI -->
+    <div class="inspector-grid">
+      <!-- Sol: Son Paketin Tüm Alanları (Detaylı Değişken & Bit Tablosu) -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Paketteki Tüm Alanlar (Tam Çözümleme)</span>
+          <span class="mono" style="font-size:11px;color:var(--accent)" id="inspectedPktLabel">Canlı Son Paket</span>
+        </div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Alan / Parametre</th>
+                <th>Byte</th>
+                <th>HEX</th>
+                <th>DEC / Binary</th>
+                <th>Çözümlenmiş Değer</th>
+              </tr>
+            </thead>
+            <tbody id="allFieldsBody" class="mono">
+              <tr><td colspan="5" style="text-align:center;color:var(--muted)">Veri bekleniyor...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Sağ: Gelen Tüm Paketler Canlı Akışı Tablosu -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <span class="card-title">Gelen Tüm Paketler Akışı (Canlı Liste)</span>
+            <span class="mono" style="font-size:11px;color:var(--muted);margin-left:8px;" id="streamCountLabel">(0 kayıt)</span>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button id="pauseBtn" class="btn" onclick="togglePause()">⏸ Akışı Duraklat</button>
+            <button class="btn" onclick="exportPacketsJson()">📥 JSON İndir</button>
+          </div>
+        </div>
+        <div style="max-height:360px;overflow:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Saat (ms)</th>
+                <th>RSSI</th>
+                <th>SEQ</th>
+                <th>Ağırlık (kg / raw)</th>
+                <th>b[4..5] (BIA / raw)</th>
+                <th>Proto / Unit</th>
+                <th>Lock (b[8])</th>
+                <th>Değişen Byte'lar (DIFF)</th>
+                <th>15-Byte Mfg HEX</th>
+              </tr>
+            </thead>
+            <tbody id="packetStreamBody" class="mono">
+              <tr><td colspan="10" style="text-align:center;color:var(--muted)">Henüz paket gelmedi...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alt: Kilitlenen Ölçüm Geçmişi & Canlı Seri Port Logları -->
+    <div class="bottom-grid">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Kilitlenen Ölçüm Geçmişi</span>
+          <button class="btn" onclick="clearHistory()">Geçmişi &amp; Tabloyu Temizle</button>
+        </div>
+        <div style="max-height:250px;overflow-y:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Tarih / Saat</th>
+                <th>Ağırlık</th>
+                <th>Empedans</th>
+                <th>VKİ (BMI)</th>
+                <th>Yağ %</th>
+              </tr>
+            </thead>
+            <tbody id="historyBody">
+              <tr><td colspan="5" style="color:var(--muted);text-align:center;">Henüz sabitlenmiş ölçüm yok</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">ESP32-S3 Seri Port Ham Akışı (COM3 @ 115200)</span>
+          <span class="mono" style="font-size:11px;color:var(--muted)">NimBLE 2.5.0</span>
+        </div>
+        <div id="terminalBox" class="terminal mono"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const BYTE_ROLES = [
+      { name: "HEADER", cls: "" },
+      { name: "SEQ", cls: "" },
+      { name: "W_HIGH", cls: "highlight-w" },
+      { name: "W_LOW", cls: "highlight-w" },
+      { name: "IMP_H", cls: "highlight-imp" },
+      { name: "IMP_L", cls: "highlight-imp" },
+      { name: "PROTO", cls: "" },
+      { name: "UNIT", cls: "" },
+      { name: "LOCK", cls: "highlight-lock" },
+      { name: "MAC_0", cls: "" },
+      { name: "MAC_1", cls: "" },
+      { name: "MAC_2", cls: "" },
+      { name: "MAC_3", cls: "" },
+      { name: "MAC_4", cls: "" },
+      { name: "MAC_5", cls: "" },
+    ];
+
+    let lastData = null;
+    let streamPaused = false;
+    let selectedPacket = null;
+
+    function toHex2(n) {
+      return "0x" + Number(n || 0).toString(16).toUpperCase().padStart(2, "0");
+    }
+
+    function toHex4(n) {
+      return "0x" + Number(n || 0).toString(16).toUpperCase().padStart(4, "0");
+    }
+
+    function toBin8(n) {
+      return Number(n || 0).toString(2).padStart(8, "0");
+    }
+
+    function loadProfile() {
+      try {
+        const saved = JSON.parse(localStorage.getItem("ble_scale_profile") || "{}");
+        if (saved.height) document.getElementById("userHeight").value = saved.height;
+        if (saved.age) document.getElementById("userAge").value = saved.age;
+        if (saved.gender) document.getElementById("userGender").value = saved.gender;
+      } catch (e) {}
+    }
+
+    function saveProfile() {
+      try {
+        localStorage.setItem("ble_scale_profile", JSON.stringify({
+          height: Number(document.getElementById("userHeight").value) || 178,
+          age: Number(document.getElementById("userAge").value) || 24,
+          gender: document.getElementById("userGender").value || "male",
+        }));
+        if (lastData) updateBIA(lastData.weight_kg, lastData.impedance);
+      } catch (e) {}
+    }
+
+    function computeMetrics(weight, impedance) {
+      const hCm = Number(document.getElementById("userHeight").value) || 178;
+      const age = Number(document.getElementById("userAge").value) || 24;
+      const isMale = document.getElementById("userGender").value === "male";
+
+      if (!weight || weight < 5) return null;
+
+      const hM = hCm / 100.0;
+      const bmi = weight / (hM * hM);
+
+      let fatPct;
+      const isOpenCircuit = !impedance || impedance === 0 || impedance === 6000;
+      const normImp = !isOpenCircuit ? (impedance > 1500 ? impedance / 10.0 : impedance) : 0;
+      if (normImp && normImp > 100 && normImp < 1500) {
+        const lbm = isMale
+          ? (hCm * hCm / normImp) * 0.401 + weight * 0.295 + 11.4 - age * 0.074
+          : (hCm * hCm / normImp) * 0.401 + weight * 0.250 + 5.1 - age * 0.065;
+        const clampedLbm = Math.min(weight * 0.94, Math.max(weight * 0.50, lbm));
+        fatPct = ((weight - clampedLbm) / weight) * 100.0;
+      } else {
+        fatPct = 1.20 * bmi + 0.23 * age - (isMale ? 16.2 : 5.4);
+      }
+
+      fatPct = Math.max(4.5, Math.min(55.0, fatPct));
+      const fatMass = weight * (fatPct / 100.0);
+      const ffm = weight - fatMass;
+      const boneMass = Math.max(1.8, Math.min(4.5, ffm * 0.048));
+      const muscleMass = ffm - boneMass;
+      const waterPct = (ffm * 0.73 / weight) * 100.0;
+      const waterLiters = weight * (waterPct / 100.0);
+      const proteinPct = Math.max(10.0, Math.min(24.0, (muscleMass / weight) * 100.0 - waterPct + 3.2));
+      const bmr = Math.round(10 * weight + 6.25 * hCm - 5 * age + (isMale ? 5 : -161));
+      const visceral = Math.max(1, Math.min(25, Math.round((bmi - 18) * 0.65 + (age - 20) * 0.12 + (isMale ? 2 : 1))));
+      const idealWeight = 22.0 * (hM * hM);
+      const metaAge = Math.max(15, Math.min(80, Math.round(age + (fatPct - (isMale ? 16 : 23)) * 0.45)));
+
+      return {
+        bmi,
+        fatPct,
+        fatMass,
+        ffm,
+        muscleMass,
+        boneMass,
+        waterPct,
+        waterLiters,
+        proteinPct,
+        bmr,
+        visceral,
+        idealWeight,
+        metaAge,
+        hasRealBia: !isOpenCircuit,
+        normImp,
+      };
+    }
+
+    function updateBIA(weight, impedance) {
+      const m = computeMetrics(weight, impedance);
+      if (!m) return;
+
+      document.getElementById("bmiVal").textContent = m.bmi.toFixed(1);
+      let bmiTxt = "Normal (İdeal)";
+      if (m.bmi < 18.5) bmiTxt = "Zayıf";
+      else if (m.bmi >= 30) bmiTxt = "Obezite Sınırı";
+      else if (m.bmi >= 25) bmiTxt = "Fazla Kilolu";
+      document.getElementById("bmiStatus").textContent = bmiTxt;
+
+      document.getElementById("fatVal").textContent = "%" + m.fatPct.toFixed(1);
+      document.getElementById("fatMassSub").textContent = `Yağ Kütlesi: ${m.fatMass.toFixed(1)} kg`;
+
+      document.getElementById("muscleVal").textContent = m.muscleMass.toFixed(1) + " kg";
+      document.getElementById("ffmSub").textContent = `Yağsız Kütle: ${m.ffm.toFixed(1)} kg`;
+
+      document.getElementById("waterVal").textContent = "%" + m.waterPct.toFixed(1);
+      document.getElementById("waterSub").textContent = `Toplam Su: ${m.waterLiters.toFixed(1)} L`;
+
+      document.getElementById("boneVal").textContent = m.boneMass.toFixed(2) + " kg";
+      document.getElementById("proteinSub").textContent = `Protein Oranı: %${m.proteinPct.toFixed(1)}`;
+
+      document.getElementById("bmrVal").textContent = m.bmr.toLocaleString("tr-TR") + " kcal";
+      document.getElementById("metaAgeSub").textContent = `Metabolik Yaş: ${m.metaAge}`;
+
+      document.getElementById("visceralVal").textContent = String(m.visceral);
+
+      const diff = weight - m.idealWeight;
+      document.getElementById("idealVal").textContent = m.idealWeight.toFixed(1) + " kg";
+      document.getElementById("idealDiffSub").textContent =
+        diff > 0 ? `+${diff.toFixed(1)} kg fazlanız var` : `${diff.toFixed(1)} kg eksiğiniz var`;
+
+      const biaStateEl = document.getElementById("biaStateVal");
+      const biaSubEl = document.getElementById("biaStateSub");
+      if (m.hasRealBia) {
+        biaStateEl.textContent = `✓ BIA Aktif (${m.normImp.toFixed(0)} Ω)`;
+        biaStateEl.style.color = "var(--emerald)";
+        biaSubEl.textContent = "Çıplak ayak direnci ölçüldü";
+      } else if (impedance === 6000) {
+        biaStateEl.textContent = "⚠ Temas Yok (0x1770)";
+        biaStateEl.style.color = "var(--amber)";
+        biaSubEl.textContent = "Çıplak ayak algılanmadı (Antropometrik tahmin)";
+      } else {
+        biaStateEl.textContent = "⏳ BIA Bekleniyor (0)";
+        biaStateEl.style.color = "var(--muted)";
+        biaSubEl.textContent = "Sabitlenince ölçülür";
+      }
+    }
+
+    function renderByteStrip(mfgBytes) {
+      const strip = document.getElementById("byteStrip");
+      const bytes = (mfgBytes && mfgBytes.length >= 15)
+        ? mfgBytes.slice(0, 15)
+        : [0xC0, 0, 0, 0, 0, 0, 0x0A, 0x01, 0x24, 0x78, 0x66, 0xA5, 0x25, 0x89, 0xCB];
+
+      strip.innerHTML = bytes.map((b, i) => {
+        const role = BYTE_ROLES[i] || { name: `B${i}`, cls: "" };
+        const hex = b.toString(16).toUpperCase().padStart(2, "0");
+        return `
+          <div class="byte-cell ${role.cls}">
+            <div class="byte-idx mono">b[${i}]</div>
+            <div class="byte-hex mono">0x${hex}</div>
+            <div class="byte-dec mono">${b}</div>
+            <div class="byte-role">${role.name}</div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderAllFieldsInspector(pkt) {
+      const tbody = document.getElementById("allFieldsBody");
+      if (!pkt || !pkt.mfg_bytes || pkt.mfg_bytes.length < 15) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--muted)">Veri bekleniyor...</td></tr>`;
+        return;
+      }
+
+      const b = pkt.mfg_bytes;
+      const wRaw = (b[2] << 8) | b[3];
+      const wLe = (b[3] << 8) | b[2];
+      const impRaw = (b[4] << 8) | b[5];
+      const impLe = (b[5] << 8) | b[4];
+      const lb = (pkt.weight_kg * 2.20462).toFixed(2);
+      const lockBit0 = (b[8] & 0x01) !== 0;
+      const macStr = b.slice(9, 15).map((x) => x.toString(16).toUpperCase().padStart(2, "0")).join(":");
+
+      const rows = [
+        {
+          name: "Paket Başlığı (Header)",
+          pos: "b[0]",
+          hex: toHex2(b[0]),
+          decBin: `${b[0]} (${toBin8(b[0])})`,
+          val: b[0] === 0xC0 ? "0xC0 Standart Tartı Çerçevesi" : "Özel Çerçeve",
+        },
+        {
+          name: "Paket Sayacı (Sequence)",
+          pos: "b[1]",
+          hex: toHex2(b[1]),
+          decBin: `${b[1]} (${toBin8(b[1])})`,
+          val: `#${b[1]} (Her yayında +1 artar)`,
+        },
+        {
+          name: "Ağırlık (Weight BE)",
+          pos: "b[2..3]",
+          hex: toHex4(wRaw),
+          decBin: `${wRaw} (LE: ${wLe})`,
+          val: `${pkt.weight_kg.toFixed(2)} kg  (${lb} lb)`,
+        },
+        {
+          name: "BIA Empedans / 2. Alan",
+          pos: "b[4..5]",
+          hex: toHex4(impRaw),
+          decBin: `${impRaw} (LE: ${impLe})`,
+          val:
+            impRaw === 0
+              ? "0 (Ölçüm Sürüyor)"
+              : impRaw === 6000
+              ? "6000 / 0x1770 (Açık Devre — Çıplak Ayak Teması Yok)"
+              : `${impRaw} ham (${impRaw > 1500 ? (impRaw / 10).toFixed(1) : impRaw} Ω — Canlı Vücut Direnci)`,
+        },
+        {
+          name: "Protokol / Kontrol Byte",
+          pos: "b[6]",
+          hex: toHex2(b[6]),
+          decBin: `${b[6]} (${toBin8(b[6])})`,
+          val: `Protokol Sabiti (${toHex2(b[6])})`,
+        },
+        {
+          name: "Birim Bayrağı (Unit)",
+          pos: "b[7]",
+          hex: toHex2(b[7]),
+          decBin: `${b[7]} (${toBin8(b[7])})`,
+          val: b[7] === 1 ? "Kilogram (KG)" : b[7] === 2 ? "Pound (LB)" : `Birim #${b[7]}`,
+        },
+        {
+          name: "Durum & Kilit (Status/Lock)",
+          pos: "b[8]",
+          hex: toHex2(b[8]),
+          decBin: `${b[8]} (${toBin8(b[8])})`,
+          val: lockBit0 ? "✓ KİLİTLİ / SABİTLENDİ (bit0=1)" : "⏳ ÖLÇÜLÜYOR (bit0=0)",
+        },
+        {
+          name: "Gömülü MAC Adresi",
+          pos: "b[9..14]",
+          hex: b.slice(9, 15).map((x) => x.toString(16).toUpperCase().padStart(2, "0")).join(" "),
+          decBin: "6 Byte Donanım ID",
+          val: macStr,
+        },
+        {
+          name: "Sinyal Gücü & Zaman",
+          pos: "BLE",
+          hex: `Paket #${pkt.id}`,
+          decBin: `${pkt.rssi} dBm`,
+          val: `${pkt.time} | DIFF: ${pkt.mfg_diff || "—"}`,
+        },
+      ];
+
+      tbody.innerHTML = rows.map((r) => `
+        <tr>
+          <td style="font-weight:700;color:var(--text)">${r.name}</td>
+          <td style="color:var(--accent)">${r.pos}</td>
+          <td style="font-weight:700">${r.hex}</td>
+          <td style="color:var(--muted)">${r.decBin}</td>
+          <td style="color:var(--emerald);font-weight:600">${r.val}</td>
+        </tr>
+      `).join("");
+    }
+
+    function selectPacketByIndex(idx) {
+      if (!lastData || !Array.isArray(lastData.packets)) return;
+      const pkt = lastData.packets[idx];
+      if (!pkt) return;
+      selectedPacket = pkt;
+      document.getElementById("inspectedPktLabel").textContent = `Seçili Paket #${pkt.id} (${pkt.time}) — Canlıya dönmek için tıkla`;
+      document.getElementById("inspectedPktLabel").style.cursor = "pointer";
+      document.getElementById("inspectedPktLabel").onclick = () => {
+        selectedPacket = null;
+        document.getElementById("inspectedPktLabel").textContent = "Canlı Son Paket";
+        if (lastData && lastData.packets && lastData.packets[0]) {
+          renderAllFieldsInspector(lastData.packets[0]);
+        }
+      };
+      renderByteStrip(pkt.mfg_bytes);
+      renderAllFieldsInspector(pkt);
+    }
+
+    function togglePause() {
+      streamPaused = !streamPaused;
+      const btn = document.getElementById("pauseBtn");
+      if (streamPaused) {
+        btn.textContent = "▶ Akışı Devam Ettir";
+        btn.className = "btn btn-amber";
+      } else {
+        btn.textContent = "⏸ Akışı Duraklat";
+        btn.className = "btn";
+        pollState();
+      }
+    }
+
+    function exportPacketsJson() {
+      if (!lastData || !lastData.packets) return;
+      const blob = new Blob([JSON.stringify(lastData.packets, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `ble-scale-packets-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    async function pollState() {
+      if (streamPaused) return;
+      try {
+        const res = await fetch("/api/state");
+        const data = await res.json();
+        lastData = data;
+
+        const dot = document.getElementById("connDot");
+        const connText = document.getElementById("connText");
+        if (data.connected) {
+          dot.className = "brand-dot";
+          connText.textContent = `${data.port} @ 115200 baud — Canlı Dinleniyor`;
+        } else {
+          dot.className = "brand-dot offline";
+          connText.textContent = `${data.port} Bağlantı Bekleniyor (${data.error || "Kapalı"})`;
+        }
+
+        document.getElementById("macLabel").textContent = data.target_mac || "78:66:a5:25:89:cb";
+        document.getElementById("pktCount").textContent = data.packet_count || 0;
+        document.getElementById("lastUpdateLabel").textContent = data.last_update ? `Son: ${data.last_update}` : "Son: —";
+
+        const weightEl = document.getElementById("weightVal");
+        const wKg = Number(data.weight_kg || 0);
+        const wRaw = Number(data.weight_raw || Math.round(wKg * 100));
+        weightEl.textContent = wKg.toFixed(2);
+        weightEl.className = data.is_locked ? "weight-value mono locked" : "weight-value mono";
+        document.getElementById("weightSubRaw").textContent =
+          `Ham: ${wRaw} (${toHex4(wRaw)}) | ${(wKg * 2.20462).toFixed(2)} lb`;
+
+        const pill = document.getElementById("statusPill");
+        if (wKg > 0 || (data.packets && data.packets.length > 0)) {
+          if (data.is_locked) {
+            pill.className = "scale-status-pill locked";
+            pill.textContent = "✓ SABİTLENDİ / KİLİTLİ";
+          } else {
+            pill.className = "scale-status-pill measuring";
+            pill.textContent = "⏳ ÖLÇÜLÜYOR...";
+          }
+        } else {
+          pill.className = "scale-status-pill";
+          pill.textContent = "TARTI BEKLENİYOR";
+        }
+
+        document.getElementById("impVal").textContent = `${data.impedance || 0} raw`;
+        document.getElementById("rssiVal").textContent = data.rssi ? `${data.rssi} dBm` : "— dBm";
+        document.getElementById("seqVal").textContent = `#${data.seq || 0}`;
+        document.getElementById("chkVal").textContent = data.lock_flag || "0x24";
+        document.getElementById("diffLabel").textContent = data.diff_str ? `DIFF: ${data.diff_str}` : "DIFF: —";
+        document.getElementById("rawHexLabel").textContent = data.raw_hex || "—";
+
+        if (!selectedPacket) {
+          renderByteStrip(data.mfg_bytes);
+          if (Array.isArray(data.packets) && data.packets.length > 0) {
+            renderAllFieldsInspector(data.packets[0]);
+          }
+        }
+
+        if (wKg > 0) {
+          updateBIA(wKg, data.impedance);
+        }
+
+        // Live Packet Stream Table
+        const streamBody = document.getElementById("packetStreamBody");
+        const pkts = Array.isArray(data.packets) ? data.packets : [];
+        document.getElementById("streamCountLabel").textContent = `(${pkts.length} paket gösteriliyor)`;
+
+        if (pkts.length > 0) {
+          streamBody.innerHTML = pkts.slice(0, 80).map((p, idx) => {
+            const lockBadge = p.is_locked
+              ? `<span class="pill-mini locked">${toHex2(p.status_flag)} KİLİTLİ</span>`
+              : `<span class="pill-mini measuring">${toHex2(p.status_flag)} ÖLÇÜYOR</span>`;
+            return `
+              <tr class="pkt-row ${p.is_locked ? "locked-row" : ""}" onclick="selectPacketByIndex(${idx})" title="Detayları incelemek için tıkla">
+                <td style="color:var(--muted)">#${p.id}</td>
+                <td>${p.time}</td>
+                <td>${p.rssi} dBm</td>
+                <td style="color:var(--accent)">#${p.seq} (${toHex2(p.seq)})</td>
+                <td style="font-weight:700;color:var(--emerald)">${Number(p.weight_kg).toFixed(2)} kg <span style="color:var(--muted);font-weight:400">(${p.weight_raw} / ${toHex4(p.weight_raw)})</span></td>
+                <td style="color:var(--accent)">${p.impedance} <span style="color:var(--muted)">(${toHex4(p.impedance)})</span></td>
+                <td>${toHex2(p.proto_flag)} / ${toHex2(p.unit_flag)}</td>
+                <td>${lockBadge}</td>
+                <td style="color:var(--amber)">${p.mfg_diff || "—"}</td>
+                <td style="color:var(--muted);font-size:11px">${p.mfg_hex}</td>
+              </tr>
+            `;
+          }).join("");
+        } else {
+          streamBody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:var(--muted)">Henüz paket gelmedi...</td></tr>`;
+        }
+
+        // History
+        const hBody = document.getElementById("historyBody");
+        if (Array.isArray(data.history) && data.history.length > 0) {
+          hBody.innerHTML = data.history.map((item) => {
+            const m = computeMetrics(item.weight_kg, item.impedance);
+            return `
+              <tr>
+                <td class="mono">${item.timestamp}</td>
+                <td class="mono" style="font-weight:700;color:var(--emerald)">${Number(item.weight_kg).toFixed(2)} kg</td>
+                <td class="mono">${item.impedance || 0}</td>
+                <td class="mono">${m ? m.bmi.toFixed(1) : "—"}</td>
+                <td class="mono">${m ? "%" + m.fatPct.toFixed(1) : "—"}</td>
+              </tr>
+            `;
+          }).join("");
+        } else {
+          hBody.innerHTML = `<tr><td colspan="5" style="color:var(--muted);text-align:center;">Henüz sabitlenmiş ölçüm yok</td></tr>`;
+        }
+
+        // Terminal logs
+        const term = document.getElementById("terminalBox");
+        if (Array.isArray(data.logs)) {
+          term.innerHTML = data.logs.slice(-50).map((l) => `
+            <div class="terminal-line"><span class="ts">[${l.time}]</span><span>${l.text}</span></div>
+          `).join("");
+          term.scrollTop = term.scrollHeight;
+        }
+      } catch (e) {}
+    }
+
+    async function simulatePacket(locked) {
+      const randomDelta = (Math.random() * 0.4 - 0.2);
+      const w = locked ? 76.40 : +(76.40 + randomDelta).toFixed(2);
+      await fetch("/api/simulate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ weight_kg: w, is_locked: locked, impedance: locked ? 485 : 0 }),
+      });
+      pollState();
+    }
+
+    async function clearHistory() {
+      await fetch("/api/clear-history", { method: "POST" });
+      selectedPacket = null;
+      pollState();
+    }
+
+    async function reclaimPort() {
+      await fetch("/api/reclaim-port", { method: "POST" });
+      setTimeout(pollState, 600);
+    }
+
+    loadProfile();
+    renderByteStrip([]);
+    pollState();
+    setInterval(pollState, 500);
+  </script>
+</body>
+</html>

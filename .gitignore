@@ -1,0 +1,6 @@
+__pycache__/
+*.py[cod]
+*$py.class
+history.json
+.env
+.DS_Store
